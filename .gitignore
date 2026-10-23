@@ -1,0 +1,18 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Node (only used for tests / local serving)
+node_modules/
+npm-debug.log*
+
+# Local artefacts
+.cache/
+*.log
+
+# Playwright MCP session output
+.playwright-mcp/

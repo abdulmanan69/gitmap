@@ -1,0 +1,32 @@
+{
+  "name": "gitmap",
+  "version": "1.0.0",
+  "description": "See the shape of any GitHub repository. A static, zero-build repository map that hosts on GitHub Pages.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "Abdul Manan (https://github.com/abdulmanan69)",
+  "homepage": "https://abdulmanan69.github.io/gitmap/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abdulmanan69/gitmap.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "npx --yes serve -l 5173 .",
+    "dev": "python -m http.server 5173",
+    "test": "node --test",
+    "check": "node scripts/check.mjs"
+  },
+  "keywords": [
+    "github",
+    "repository",
+    "visualization",
+    "treemap",
+    "d3",
+    "github-pages",
+    "static-site"
+  ]
+}

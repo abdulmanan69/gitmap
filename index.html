@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GitMap — see the shape of any repository</title>
+  <meta name="description" content="Paste a GitHub repository and get a navigable map of its files, languages, people and history. Runs entirely in your browser." />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0c1020" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+  <meta property="og:title" content="GitMap — see the shape of any repository" />
+  <meta property="og:description" content="Treemaps, atlases, sunbursts and health reports for any public GitHub repo. Free, static, no backend." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://api.github.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles/base.css" />
+  <link rel="stylesheet" href="./styles/components.css" />
+  <link rel="stylesheet" href="./styles/views.css" />
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    (function () {
+      try {
+        var saved = localStorage.getItem('gitmap:theme');
+        var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+        var theme = saved || (prefersLight ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) { /* storage blocked: keep default */ }
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div id="app" class="app">
+    <header class="topbar" role="banner">
+      <a class="brand" href="./" aria-label="GitMap home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/>
+          <circle cx="12" cy="13" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="21" cy="20" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="12" cy="13" r="2" fill="var(--accent)"/>
+          <circle cx="21" cy="20" r="1.4" fill="var(--accent)"/>
+        </svg>
+        <span class="brand-name">GitMap</span>
+      </a>
+
+      <form class="repo-switcher" id="repo-switcher" autocomplete="off" hidden>
+        <label class="sr-only" for="repo-switch-input">Repository</label>
+        <span class="repo-switcher-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
+        </span>
+        <input id="repo-switch-input" name="repo" type="text" spellcheck="false" placeholder="owner/repo" aria-label="Switch repository" />
+        <button type="submit" class="btn btn-ghost btn-sm">Map it</button>
+      </form>
+
+      <div class="topbar-actions">
+        <button class="btn btn-icon" id="btn-settings" type="button" title="Settings and access token" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button class="btn btn-icon" id="btn-theme" type="button" title="Toggle light / dark" aria-label="Toggle theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <a class="btn btn-icon" id="btn-github" href="https://github.com" target="_blank" rel="noopener" title="Open this repository on GitHub" aria-label="Open on GitHub" hidden>
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+        </a>
+      </div>
+    </header>
+
+    <main id="main" class="main" tabindex="-1">
+      <!-- Landing -->
+      <section id="hero" class="hero" aria-labelledby="hero-title">
+        <canvas id="hero-canvas" class="hero-canvas" aria-hidden="true"></canvas>
+        <div class="hero-inner">
+          <p class="eyebrow">A map for code</p>
+          <h1 id="hero-title" class="hero-title">See the shape of<br/>any repository.</h1>
+          <p class="hero-lede">Paste a GitHub repo. GitMap surveys its tree and draws the files, languages, people and history as a navigable map. Runs in your browser. Nothing leaves it.</p>
+
+          <form class="hero-form" id="hero-form" autocomplete="off">
+            <label class="sr-only" for="hero-input">GitHub repository</label>
+            <div class="hero-input-wrap">
+              <span class="hero-input-prefix" aria-hidden="true">github.com/</span>
+              <input id="hero-input" name="repo" type="text" spellcheck="false" placeholder="owner/repository" autofocus />
+              <button type="submit" class="btn btn-primary" id="hero-submit">
+                <span>Map it</span>
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L11.44 8.25H2.75a.75.75 0 0 1 0-1.5h8.69L8.22 4.03a.75.75 0 0 1 0-1.06Z"/></svg>
+              </button>
+            </div>
+            <p class="hero-hint" id="hero-hint">Also accepts full URLs, branch links and <code>git@</code> remotes.</p>
+          </form>
+
+          <div class="hero-samples" aria-label="Example repositories">
+            <span class="hero-samples-label">Try</span>
+            <button type="button" class="chip" data-repo="d3/d3">d3/d3</button>
+            <button type="button" class="chip" data-repo="facebook/react">facebook/react</button>
+            <button type="button" class="chip" data-repo="vitejs/vite">vitejs/vite</button>
+            <button type="button" class="chip" data-repo="pallets/flask">pallets/flask</button>
+            <button type="button" class="chip" data-repo="tokio-rs/tokio">tokio-rs/tokio</button>
+          </div>
+        </div>
+
+        <div class="hero-footer">
+          <ul class="hero-facts">
+            <li><strong>Seven views</strong><span>treemap, atlas, sunburst, explorer, dependencies, people, health</span></li>
+            <li><strong>Static</strong><span>hosts on GitHub Pages, no server, no database</span></li>
+            <li><strong>Private</strong><span>talks to api.github.com directly, your token never leaves the browser</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Workspace -->
+      <section id="workspace" class="workspace" hidden>
+        <div class="repo-header" id="repo-header"></div>
+
+        <nav class="viewtabs" id="viewtabs" aria-label="Views"></nav>
+
+        <div class="stage" id="stage">
+          <div class="sheet" id="sheet">
+            <div class="sheet-corner tl" aria-hidden="true"></div>
+            <div class="sheet-corner tr" aria-hidden="true"></div>
+            <div class="sheet-corner bl" aria-hidden="true"></div>
+            <div class="sheet-corner br" aria-hidden="true"></div>
+            <div class="view-root" id="view-root" role="region" aria-live="polite"></div>
+          </div>
+          <aside class="inspector" id="inspector" aria-label="Selection details" hidden></aside>
+        </div>
+
+        <footer class="statusbar" id="statusbar"></footer>
+      </section>
+    </main>
+
+    <div id="loader" class="loader" hidden role="status" aria-live="polite"></div>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+    <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+    <dialog id="settings" class="dialog" aria-labelledby="settings-title">
+      <form method="dialog" class="dialog-body" id="settings-form">
+        <header class="dialog-head">
+          <h2 id="settings-title">Settings</h2>
+          <button type="submit" class="btn btn-icon" value="close" aria-label="Close">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+          </button>
+        </header>
+
+        <section class="field">
+          <label for="token-input">GitHub access token <span class="muted">(optional)</span></label>
+          <input id="token-input" type="password" placeholder="ghp_… or github_pat_…" autocomplete="off" spellcheck="false" />
+          <p class="help">Raises the API limit from 60 to 5,000 requests per hour and lets you map private repositories you can already see. A read-only token is enough. Stored in this browser only.</p>
+          <label class="check"><input type="checkbox" id="token-remember" /> Remember on this device</label>
+        </section>
+
+        <section class="field">
+          <label for="maxnodes-input">Map detail <span class="muted" id="maxnodes-label">2,500 shapes</span></label>
+          <input id="maxnodes-input" type="range" min="600" max="8000" step="100" value="2500" />
+          <p class="help">Upper bound on shapes drawn in the Atlas and Sunburst. Lower is faster on very large repositories.</p>
+        </section>
+
+        <section class="field">
+          <label>Cache</label>
+          <p class="help">API responses are kept for 15 minutes in this tab so switching views costs no requests.</p>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-cache">Clear cached responses</button>
+        </section>
+
+        <footer class="dialog-foot">
+          <button type="submit" class="btn btn-primary" value="save">Save</button>
+        </footer>
+      </form>
+    </dialog>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
